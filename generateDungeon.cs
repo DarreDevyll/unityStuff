@@ -5,14 +5,18 @@ using UnityEditor;
 
 public class generateDungeon : MonoBehaviour
 {
+    // tile class used to hold game objects as well as the attach point direction data
     public class tile
     {
         public GameObject prefab;
+
+        // attach point direction data of game object
         public int? left;
         public int? right;
         public int? up;
         public int? down;
 
+        // constructor when passed a game object
         public tile(GameObject piece)
         {
             prefab = piece;
@@ -22,6 +26,7 @@ public class generateDungeon : MonoBehaviour
             down = 0;
         }
 
+        // function used to print direction data to console
         public void printDirections()
         {
             Debug.Log(down);
@@ -30,43 +35,34 @@ public class generateDungeon : MonoBehaviour
             Debug.Log(right);
         }
 
+        // implicit initialization of tile from game object
         public static implicit operator tile(GameObject x) => new tile(x);
     };
 
+    // public list of game objects set in the unity editor
     public List<GameObject> singleWall = new List<GameObject>();
     public List<GameObject> doubleWalls = new List<GameObject>();
     public List<GameObject> Ends = new List<GameObject>();
     public List<GameObject> Rooms = new List<GameObject>();
 
+    // Private Lists of tiles that are initialized on start
     List<tile> sWall = new List<tile>();
     List<tile> dWall = new List<tile>();
     List<tile> ends = new List<tile>();
     List<tile> rooms = new List<tile>();
 
-    List<Vector3> attachPoints = new List<Vector3>(); // all possible attach points
+    // list all possible attach points in current level
+    List<Vector3> attachPoints = new List<Vector3>();
 
-    public int seed;
-    int randomNumber;
+    //random number generator variables
+    public int seed; // seed for generator
+    int randomNumber; // int to hold randomly generated number
+    public System.Random rand; // rand variable to hold random function
 
-    public System.Random rand;
+
     // Start is called before the first frame update
     void Start()
     {
-        /*
-        for (int i = 0; i < 4; i++)
-        {
-            ends.Insert(i, stuff[i]);
-        }
-        ends[0].left = 5;
-        Debug.Log(ends[0].left);
-        */
-        /*
-        tile piece = start;
-        piece.left = (int) start.transform.Find("attachLeft").localPosition.x;
-        Debug.Log(piece.left);
-        */
-
-
         // Random rand = new Random(Guid.NewGuid().GetHashCode());
 
         // Old Level Gen to the left
@@ -107,35 +103,21 @@ public class generateDungeon : MonoBehaviour
         Instantiate(ends[1].prefab, new Vector3(dist, 0, 0), Quaternion.identity);
         */
 
-        setTileData(); // Sets up tile lists with direction data
+        // Sets up tile lists with direction data
+        setTileData();
+
+        // seeding the random number generator
+        rand = new System.Random(seed);
         
-        /*
-        sWall.Insert(0, singleWall[0]);
-
-        int? direction;
-
-        if(sWall[0].prefab.transform.Find("attachDown") == null)
-        {
-            Debug.Log("Couldn't find attachDown");
-            direction = null;
-        }
-        else
-        {
-            direction = (int) sWall[0].prefab.transform.Find("attachDown").localPosition.y;
-        }
-        */
-
-        rand = new System.Random(seed); // random number generator
-        //Instantiate(start, new Vector3(0, 0, 0), Quaternion.identity);
-        //randomNumber = rand.Next(0, 3);
-
-        
+        // getting random room and setting it as the first room in the level
         randomNumber = rand.Next(0, 3);
         Instantiate(rooms[randomNumber].prefab, new Vector3(0, 0, 0), Quaternion.identity);
 
+        // debug room number and direction data to make sure it all works right
         Debug.Log(randomNumber);
         rooms[randomNumber].printDirections();
 
+        // setting attach points based on first room placed
         if (rooms[randomNumber].down != null)
             attachPoints.Add(new Vector3(0,(float) rooms[randomNumber].down, 0));
         if (rooms[randomNumber].left != null)
@@ -145,25 +127,54 @@ public class generateDungeon : MonoBehaviour
         if (rooms[randomNumber].right != null)
             attachPoints.Add(new Vector3((float)rooms[randomNumber].right, 0, 3));
 
+        // getting a random number of hall pieces
         randomNumber = rand.Next(1, 5);
-        int? rightAttach;
-        int rAttachIndex;
+        int rAttachIndex; // element index of right most attach point
+        float roomCenter; // holds x value of room center
 
+        // setting random number of hall pieces
         for (int i = 0; i < randomNumber; i++)
         {
-            rightAttach = getLayerRightAttach();
-            if (rightAttach == null)
+            // getting right attach point for layer
+            if (getLayerRightAttach() == null)
             {
                 Debug.Log("No Right Attach Point in Layer 1");
                 break;
             }
             else
-                rAttachIndex = (int) rightAttach;
+                rAttachIndex = (int) getLayerRightAttach();
+            // setting hall piece
             Instantiate(dWall[0].prefab, new Vector3((float) (attachPoints[rAttachIndex].x - dWall[0].left), 0, 0), Quaternion.identity);
+            // adding halls right attach point to attachPoints list
             attachPoints.Add(new Vector3((float) (attachPoints[rAttachIndex].x - dWall[0].left + dWall[0].right), 0, 3));
+            // removing old attach point
             attachPoints.RemoveAt(rAttachIndex);
         }
-        
+
+        // getting a new random room and printing its data to console
+        randomNumber = rand.Next(0, 3);
+        Debug.Log(randomNumber);
+        rooms[randomNumber].printDirections();
+
+        // setting it at the right attach point in layer
+        rAttachIndex = (int) getLayerRightAttach();
+        Instantiate(rooms[randomNumber].prefab, new Vector3((float) (attachPoints[rAttachIndex].x - rooms[randomNumber].left), 0, 0), Quaternion.identity);
+
+        // getting room center and removing old right attach point
+        roomCenter = (float) (attachPoints[rAttachIndex].x - rooms[randomNumber].left);
+        attachPoints.RemoveAt(rAttachIndex);
+
+        // setting 3 new attach points from room
+        if (rooms[randomNumber].down != null)
+            attachPoints.Add(new Vector3(roomCenter,(float) rooms[randomNumber].down, 0));
+        if (rooms[randomNumber].up != null)
+            attachPoints.Add(new Vector3(roomCenter,(float) rooms[randomNumber].up, 2));
+        if (rooms[randomNumber].right != null)
+            attachPoints.Add(new Vector3((float)(roomCenter + rooms[randomNumber].right), 0, 3));
+
+        // placing ends at all remaining attach points
+        placeEnds();
+
 
     }
 
@@ -178,32 +189,33 @@ public class generateDungeon : MonoBehaviour
 
     }
 
+    // Check if attach direction exists. If so return it's value casted as int
     int? tryAttach(tile piece, int dir)
     {
-        int? direction;
-
         if (dir == 0 && piece.prefab.transform.Find("attachDown") != null)
-        {
-            direction = (int) piece.prefab.transform.Find("attachDown").localPosition.y;
-            return direction;
-        }
+            return (int) piece.prefab.transform.Find("attachDown").localPosition.y;
         else if (dir == 1 && piece.prefab.transform.Find("attachLeft") != null)
-        {
-            direction = (int) piece.prefab.transform.Find("attachLeft").localPosition.x;
-            return direction;
-        }
+            return (int) piece.prefab.transform.Find("attachLeft").localPosition.x;
         else if (dir == 2 && piece.prefab.transform.Find("attachUp") != null)
-        {
-            direction = (int) piece.prefab.transform.Find("attachUp").localPosition.y;
-            return direction;
-        }
+            return (int) piece.prefab.transform.Find("attachUp").localPosition.y;
         else if (dir == 3 && piece.prefab.transform.Find("attachRight") != null)
-        {
-            direction = (int) piece.prefab.transform.Find("attachRight").localPosition.x;
-            return direction;
-        }
-
+            return (int) piece.prefab.transform.Find("attachRight").localPosition.x;
         return null;
+    }
+
+    void placeEnds()
+    {
+        for (int i = 0; i < attachPoints.Count; i++)
+        {
+            if (attachPoints[i].z == 0)
+                Instantiate(ends[0].prefab, new Vector3(attachPoints[i].x, attachPoints[i].y, 0), Quaternion.identity);
+            else if (attachPoints[i].z == 1)
+                Instantiate(ends[1].prefab, new Vector3(attachPoints[i].x, attachPoints[i].y, 0), Quaternion.identity);
+            else if (attachPoints[i].z == 2)
+                Instantiate(ends[2].prefab, new Vector3(attachPoints[i].x, attachPoints[i].y, 0), Quaternion.identity);
+            else if (attachPoints[i].z == 3)
+                Instantiate(ends[3].prefab, new Vector3(attachPoints[i].x, attachPoints[i].y, 0), Quaternion.identity);
+        }
     }
 
     // get index of right most attach of layer
@@ -218,12 +230,7 @@ public class generateDungeon : MonoBehaviour
         {
             if (attachPoints[i].z == 3)
             {
-                if (right == null)
-                {
-                    right = (int)attachPoints[i].z;
-                    location = i;
-                }
-                else if (attachPoints[i].z > right)
+                if (right == null || attachPoints[i].z > right)
                 {
                     right = (int)attachPoints[i].z;
                     location = i;
@@ -233,6 +240,7 @@ public class generateDungeon : MonoBehaviour
         return location;
     }
 
+    // Setting prefab and direction data of each room piece to an element in tile list
     void setTileData()
     {
         for (int i = 0; i < 4; i++)
@@ -253,6 +261,7 @@ public class generateDungeon : MonoBehaviour
             ends[i].up = tryAttach(ends[i], 2);
             ends[i].right = tryAttach(ends[i], 3);
 
+            // setting rooms
             if (i < 3)
             {
                 rooms.Insert(i, Rooms[i]);
@@ -264,6 +273,7 @@ public class generateDungeon : MonoBehaviour
             }
         }
 
+        // setting halls
         for (int i = 0; i < 2; i++)
         {
             dWall.Insert(i, doubleWalls[i]);
@@ -273,7 +283,5 @@ public class generateDungeon : MonoBehaviour
             dWall[i].up = tryAttach(dWall[i], 2);
             dWall[i].right = tryAttach(dWall[i], 3);
         }
-
-        
     }
 }
